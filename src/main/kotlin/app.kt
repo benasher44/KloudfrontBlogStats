@@ -1,23 +1,17 @@
 package com.benasher44.kloudfrontblogstats
 
-import com.benasher44.AccessLog
-import com.benasher44.KBSDatabase
-import com.squareup.sqldelight.db.SqlDriver
-import com.squareup.sqldelight.sqlite.driver.asJdbcDriver
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.postgresql.ds.PGSimpleDataSource
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3Client
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
 import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import java.io.InputStream
 import java.io.OutputStream
-import java.sql.DriverManager
 import java.util.zip.GZIPInputStream
-import javax.sql.DataSource
 
 private val REGION = requireNotNull(System.getenv("AWS_DEFAULT_REGION")) {
     "Specify AWS region by setting the AWS_DEFAULT_REGION env var"
@@ -28,7 +22,7 @@ private data class S3Object(val bucket: String, val key: String)
 public fun s3Handler(input: InputStream, output: OutputStream) {
     try {
         val stringInput = input.readBytes().decodeToString()
-        val json = Json {  }.parseToJsonElement(stringInput)
+        val json = Json { }.parseToJsonElement(stringInput)
         val records = json.jsonObject["Records"]!!.jsonArray
 
         val objects = records.asSequence()
@@ -89,55 +83,25 @@ private fun handleObject(s3o: S3Object) {
         .build()
     S3.getObject(getRequest).use { downloadStream ->
         GZIPInputStream(downloadStream).use { input ->
-            input.bufferedReader().useLines { lines ->
-                lateinit var fields: Map<String, Int>
-                lines.filter { line ->
-                    if (line.startsWith("#Fields:")) {
-                        fields = line.substringAfter("#Feilds:")
-                            .trim()
-                            .split(" ")
-                            .withIndex()
-                            .associate { it.value to it.index }
-                        false
-                    } else !line.startsWith("#")
-                }
-
-                val url = System.getenv("PG_URL")
-                val ds = PGSimpleDataSource()
-                ds.setUrl(url)
-                ds.user = System.getenv("PG_USER")
-                ds.password = System.getenv("PG_PASSWORD")
-
-                ds.asJdbcDriver().use { driver ->
-                    val database = KBSDatabase(driver)
-                    val queries = database.accessLogQueries
-                    queries.transaction {
-                        for (line in lines) {
-                            val values = CSVLine(line, fields)
-
-                            // HTTP status
-                            if (values["sc-status"] != "200") continue
-
-                            // HTTP method
-                            if (values["cs-method"] != "GET") continue
-
-                            queries.insertLog(
-                                // date and time in UTC
-                                "${values["date"]} ${values["time"]} z",
-
-                                // Referer header
-                                values["cs(Referer)"].takeUnless { it == "-" },
-
-                                // User-Agent
-                                values["cs(User-Agent)"].takeUnless { it == "-" },
-
-                                // Path
-                                values["cs-uri-stem"]
-                            )
-                        }
+            withNewConnection { queries ->
+                queries.transaction {
+                    input.enumerateLogs { date, time, referer, userAgent, path ->
+                        queries.insertLog(
+                            // date and time in UTC
+                            "$date $time z",
+                            referer,
+                            userAgent,
+                            path
+                        )
                     }
                 }
             }
         }
     }
+
+    val deleteRequest = DeleteObjectRequest.builder()
+        .bucket(s3o.bucket)
+        .key(s3o.key)
+        .build()
+    S3.deleteObject(deleteRequest)
 }

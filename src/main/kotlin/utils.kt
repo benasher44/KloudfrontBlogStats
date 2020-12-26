@@ -1,7 +1,11 @@
 package com.benasher44.kloudfrontblogstats
 
+import com.benasher44.AccessLogQueries
+import com.benasher44.KBSDatabase
+import com.squareup.sqldelight.sqlite.driver.asJdbcDriver
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.postgresql.ds.PGSimpleDataSource
 import java.util.logging.Level
 import java.util.logging.Logger
 
@@ -27,4 +31,16 @@ internal class CSVLine(line: String, private val fields: Map<String, Int>) {
     private val values = line.trim().split("\t")
 
     operator fun get(key: String): String = values[fields[key]!!]
+}
+
+internal fun withNewConnection(dbLambda: (queries: AccessLogQueries) -> Unit) {
+    val url = System.getenv("PG_URL")
+    val ds = PGSimpleDataSource()
+    ds.setUrl(url)
+    ds.user = System.getenv("PG_USER")
+    ds.password = System.getenv("PG_PASSWORD")
+    ds.asJdbcDriver().use { driver ->
+        val database = KBSDatabase(driver)
+        dbLambda(database.accessLogQueries)
+    }
 }
