@@ -1,0 +1,7 @@
+CREATE TABLE AccessLog(
+    id SERIAL PRIMARY KEY,
+    accessedAt TIMESTAMP NOT NULL,
+    referer TEXT,
+    userAgent TEXT,
+    path TEXT NOT NULL
+);
