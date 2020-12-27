@@ -7,8 +7,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
-internal data class S3Object(val bucket: String, val key: String)
-
 internal sealed class S3ObjectParseResult {
     data class InvalidRegion(val foundRegion: String, val expectedRegion: String) : S3ObjectParseResult() {
         val message = "$foundRegion does not match $expectedRegion"

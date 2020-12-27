@@ -2,12 +2,10 @@ package com.benasher44.kloudfrontblogstats
 
 import com.benasher44.kloudfrontblogstats.logic.S3Object
 import com.benasher44.kloudfrontblogstats.logic.S3ObjectParseResult
+import com.benasher44.kloudfrontblogstats.logic.S3Service
 import com.benasher44.kloudfrontblogstats.logic.enumerateLogs
 import com.benasher44.kloudfrontblogstats.logic.s3ResultsFromEventJson
 import software.amazon.awssdk.regions.Region
-import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
-import software.amazon.awssdk.services.s3.model.GetObjectRequest
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.logging.Level
@@ -56,16 +54,11 @@ private fun handleObjects(objects: Iterable<S3ObjectParseResult>) {
     }
 }
 
-private val S3 = S3Client.builder()
-    .region(Region.of(REGION))
-    .build()
-
-private fun handleObject(s3o: S3Object) {
-    val getRequest = GetObjectRequest.builder()
-        .bucket(s3o.bucket)
-        .key(s3o.key)
-        .build()
-    S3.getObject(getRequest).use { downloadStream ->
+private fun handleObject(
+    s3o: S3Object,
+    s3Service: S3Service = S3Service(Region.of(REGION))
+) {
+    s3Service.getObject(s3o).use { downloadStream ->
         GZIPInputStream(downloadStream).use { input ->
             withNewConnection { queries ->
                 queries.transaction {
@@ -82,12 +75,7 @@ private fun handleObject(s3o: S3Object) {
             }
         }
     }
-
-    val deleteRequest = DeleteObjectRequest.builder()
-        .bucket(s3o.bucket)
-        .key(s3o.key)
-        .build()
-    S3.deleteObject(deleteRequest)
+    s3Service.deleteObject(s3o)
 }
 
 private object Logging {
