@@ -1,8 +1,8 @@
-package com.benasher44.kloudfrontblogstats
+package com.benasher44.kloudfrontblogstats.logic
 
-import sun.nio.cs.UTF_8
 import java.io.InputStream
 import java.net.URLDecoder
+import java.nio.charset.StandardCharsets.UTF_8
 
 private class LogLine(line: String, private val fields: Map<String, Int>) {
     private val values = line.trim().split("\t")
@@ -10,7 +10,7 @@ private class LogLine(line: String, private val fields: Map<String, Int>) {
     // log values are url-encoded
     operator fun get(key: String): String = URLDecoder.decode(
         values[fields[key]!!],
-        UTF_8.defaultCharset()
+        UTF_8.name()
     )
 }
 
