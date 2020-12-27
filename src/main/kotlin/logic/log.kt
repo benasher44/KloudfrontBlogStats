@@ -9,7 +9,8 @@ private class LogLine(line: String, private val fields: Map<String, Int>) {
 
     // log values are url-encoded
     operator fun get(key: String): String = URLDecoder.decode(
-        values[fields[key]!!],
+        // avoid URLDecoder decoding "+" as " "
+        values[fields[key]!!].replace("+", "%2B"),
         UTF_8.name()
     )
 }
@@ -25,9 +26,9 @@ internal typealias LogLambda = (
 internal fun InputStream.enumerateLogs(lambda: LogLambda) {
     bufferedReader().useLines { lines ->
         lateinit var fields: Map<String, Int>
-        lines.filter { line ->
+        val filteredLines = lines.filter { line ->
             if (line.startsWith("#Fields:")) {
-                fields = line.substringAfter("#Feilds:")
+                fields = line.substringAfter("#Fields:")
                     .trim()
                     .split(" ")
                     .withIndex()
@@ -35,7 +36,7 @@ internal fun InputStream.enumerateLogs(lambda: LogLambda) {
                 false
             } else !line.startsWith("#")
         }
-        for (line in lines) {
+        for (line in filteredLines) {
             val values = LogLine(line, fields)
 
             // HTTP status
@@ -69,7 +70,7 @@ private fun String.nullIfEmptyLogValue(): String? =
 private fun String.normalizeUrl(): String = this
 
     // trim trailing slash
-    .substringBeforeLast("/")
+    .trimEnd('/')
 
     // remove leading http://
     .substringAfter("http://")
