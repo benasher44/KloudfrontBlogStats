@@ -27,12 +27,6 @@ internal object Logging {
     }
 }
 
-internal class CSVLine(line: String, private val fields: Map<String, Int>) {
-    private val values = line.trim().split("\t")
-
-    operator fun get(key: String): String = values[fields[key]!!]
-}
-
 internal fun withNewConnection(dbLambda: (queries: AccessLogQueries) -> Unit) {
     val url = System.getenv("PG_URL")
     val ds = PGSimpleDataSource()

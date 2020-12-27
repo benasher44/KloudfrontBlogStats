@@ -1,6 +1,18 @@
 package com.benasher44.kloudfrontblogstats
 
+import sun.nio.cs.UTF_8
 import java.io.InputStream
+import java.net.URLDecoder
+
+private class LogLine(line: String, private val fields: Map<String, Int>) {
+    private val values = line.trim().split("\t")
+
+    // log values are url-encoded
+    operator fun get(key: String): String = URLDecoder.decode(
+        values[fields[key]!!],
+        UTF_8.defaultCharset()
+    )
+}
 
 internal typealias LogLambda = (
     date: String,
@@ -24,7 +36,7 @@ internal fun InputStream.enumerateLogs(lambda: LogLambda) {
             } else !line.startsWith("#")
         }
         for (line in lines) {
-            val values = CSVLine(line, fields)
+            val values = LogLine(line, fields)
 
             // HTTP status
             if (values["sc-status"] != "200") continue
@@ -38,13 +50,13 @@ internal fun InputStream.enumerateLogs(lambda: LogLambda) {
                 values["time"],
 
                 // Referer header
-                values["cs(Referer)"].nullIfEmptyLogValue(),
+                values["cs(Referer)"].nullIfEmptyLogValue()?.normalizeUrl(),
 
                 // User-Agent
                 values["cs(User-Agent)"].nullIfEmptyLogValue(),
 
                 // Path
-                values["cs-uri-stem"]
+                values["cs-uri-stem"].normalizeUrl()
             )
         }
     }
@@ -53,3 +65,14 @@ internal fun InputStream.enumerateLogs(lambda: LogLambda) {
 // null values are represented by "-" in the log
 private fun String.nullIfEmptyLogValue(): String? =
     this.takeUnless { it == "-" }
+
+private fun String.normalizeUrl(): String = this
+
+    // trim trailing slash
+    .substringBeforeLast("/")
+
+    // remove leading http://
+    .substringAfter("http://")
+
+    // remove leading https://
+    .substringAfter("https://")
