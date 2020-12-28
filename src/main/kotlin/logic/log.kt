@@ -40,7 +40,7 @@ internal fun InputStream.enumerateLogs(lambda: LogLambda) {
             val values = LogLine(line, fields)
 
             // HTTP status
-            if (values["sc-status"] != "200") continue
+            if (values["sc-status"] != "200" && values["sc-status"] != "304") continue
 
             // HTTP method
             if (values["cs-method"] != "GET") continue
