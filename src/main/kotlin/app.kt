@@ -36,6 +36,7 @@ public fun s3Handler(input: InputStream, output: OutputStream) {
 
 private fun handleObjects(objects: Iterable<S3ObjectParseResult>) {
     try {
+        val s3Service = S3Service(Region.of(REGION), true)
         val count = objects.fold(0) { soFar, result ->
             when (result) {
                 is S3ObjectParseResult.InvalidRegion -> {
@@ -44,7 +45,7 @@ private fun handleObjects(objects: Iterable<S3ObjectParseResult>) {
                 }
                 is S3ObjectParseResult.Success -> {
                     try {
-                        handleObject(result.s3Object)
+                        handleObject(result.s3Object, s3Service)
                         soFar + 1
                     } catch (e: Throwable) {
                         LOGGER.error("Processing error: $result -  ${e.logMessage()}")
@@ -62,11 +63,10 @@ private fun handleObjects(objects: Iterable<S3ObjectParseResult>) {
 
 private fun handleObject(
     s3o: S3Object,
-    s3Service: S3Service? = null
+    s3Service: S3Service
 ) {
-    val service = s3Service ?: S3Service(Region.of(REGION), true)
     LOGGER.log("Getting ${s3o.key}")
-    service.getObject(s3o).use { downloadStream ->
+    s3Service.getObject(s3o).use { downloadStream ->
         GZIPInputStream(downloadStream).use { input ->
             withNewConnection { queries ->
                 queries.transaction {
@@ -84,7 +84,7 @@ private fun handleObject(
         }
     }
     LOGGER.log("Deleting ${s3o.key}")
-    service.deleteObject(s3o)
+    s3Service.deleteObject(s3o)
 }
 
 fun main(args: Array<String>) = CLI {
