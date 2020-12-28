@@ -17,7 +17,7 @@ import java.util.zip.GZIPInputStream
 import kotlin.system.exitProcess
 
 private val REGION by lazy {
-    requireNotNull(System.getenv("AWS_DEFAULT_REGION")) {
+    requireNotNull(System.getenv("LOG_BUCKET_REGION")) {
         "Specify AWS region by setting the AWS_DEFAULT_REGION env var"
     }
 }
