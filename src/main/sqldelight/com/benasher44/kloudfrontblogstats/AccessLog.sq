@@ -5,3 +5,7 @@ CREATE TABLE AccessLog(
     userAgent TEXT,
     path TEXT NOT NULL
 );
+
+insertLog:
+INSERT INTO AccessLog(accessedAt, referer, userAgent, path)
+VALUES (?, ?, ?, ?);

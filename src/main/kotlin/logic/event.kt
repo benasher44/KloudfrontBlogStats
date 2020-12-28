@@ -1,6 +1,5 @@
 package com.benasher44.kloudfrontblogstats.logic
 
-import com.benasher44.kloudfrontblogstats.stringContent
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -13,6 +12,9 @@ internal sealed class S3ObjectParseResult {
     }
     class Success(val s3Object: S3Object) : S3ObjectParseResult()
 }
+
+private fun JsonObject.stringContent(key: String): String? =
+    this[key]?.jsonPrimitive?.content
 
 internal fun s3ResultsFromEventJson(jsonStr: String, expectedRegion: String): Iterable<S3ObjectParseResult> {
     val json = Json.Default.parseToJsonElement(jsonStr)

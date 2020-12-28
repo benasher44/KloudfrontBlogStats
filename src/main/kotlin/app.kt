@@ -1,19 +1,24 @@
 package com.benasher44.kloudfrontblogstats
 
+import com.benasher44.kloudfrontblogstats.logic.CLI
 import com.benasher44.kloudfrontblogstats.logic.S3Object
 import com.benasher44.kloudfrontblogstats.logic.S3ObjectParseResult
 import com.benasher44.kloudfrontblogstats.logic.S3Service
 import com.benasher44.kloudfrontblogstats.logic.enumerateLogs
 import com.benasher44.kloudfrontblogstats.logic.s3ResultsFromEventJson
+import com.benasher44.kloudfrontblogstats.utils.withNewConnection
 import software.amazon.awssdk.regions.Region
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.logging.Level
 import java.util.logging.Logger
 import java.util.zip.GZIPInputStream
+import kotlin.system.exitProcess
 
-private val REGION = requireNotNull(System.getenv("AWS_DEFAULT_REGION")) {
-    "Specify AWS region by setting the AWS_DEFAULT_REGION env var"
+private val REGION by lazy {
+    requireNotNull(System.getenv("AWS_DEFAULT_REGION")) {
+        "Specify AWS region by setting the AWS_DEFAULT_REGION env var"
+    }
 }
 
 @Suppress("unused", "RedundantVisibilityModifier")
@@ -56,9 +61,10 @@ private fun handleObjects(objects: Iterable<S3ObjectParseResult>) {
 
 private fun handleObject(
     s3o: S3Object,
-    s3Service: S3Service = S3Service(Region.of(REGION))
+    s3Service: S3Service? = null
 ) {
-    s3Service.getObject(s3o).use { downloadStream ->
+    val service = s3Service ?: S3Service(Region.of(REGION), true)
+    service.getObject(s3o).use { downloadStream ->
         GZIPInputStream(downloadStream).use { input ->
             withNewConnection { queries ->
                 queries.transaction {
@@ -75,8 +81,25 @@ private fun handleObject(
             }
         }
     }
-    s3Service.deleteObject(s3o)
+    service.deleteObject(s3o)
 }
+
+fun main(args: Array<String>) = CLI {
+    val service = S3Service(region, allowDelete)
+    try {
+        service.enumerateObjectsInBucket(bucket) { s3o, count ->
+            if (!count.isInitialized()) {
+                Logging.log("Listed ${count.value} keys.")
+            }
+            handleObject(s3o, service)
+            exitProcess(0)
+        }
+    } catch (e: Throwable) {
+        Logging.error(e.logMessage())
+        exitProcess(1)
+    }
+    exitProcess(0)
+}.main(args)
 
 private object Logging {
     private val logger: Logger = Logger.getLogger(this::javaClass.name)
@@ -89,3 +112,6 @@ private object Logging {
         logger.log(Level.SEVERE, msg)
     }
 }
+
+private fun Throwable.logMessage(): String =
+    "$this - $message: ${stackTraceToString()}"

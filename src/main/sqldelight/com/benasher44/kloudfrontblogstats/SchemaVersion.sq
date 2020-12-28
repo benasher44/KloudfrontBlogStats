@@ -1,0 +1,7 @@
+CREATE TABLE SchemaVersion (
+    id INT PRIMARY KEY NOT NULL,
+    version INT NOT NULL
+);
+
+setVersion:
+INSERT INTO SchemaVersion(id, version) VALUES (0, 1);

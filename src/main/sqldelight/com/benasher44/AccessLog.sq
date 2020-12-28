@@ -1,4 +1,0 @@
-
-insertLog:
-INSERT INTO AccessLog(accessedAt, referer, userAgent, path)
-VALUES (?, ?, ?, ?);

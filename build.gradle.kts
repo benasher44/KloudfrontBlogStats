@@ -4,6 +4,7 @@ plugins {
     kotlin("jvm") version "1.4.21"
     kotlin("plugin.serialization") version "1.4.21"
     id("com.squareup.sqldelight") version "1.4.4"
+    application
 }
 
 group = "com.benasher44"
@@ -23,11 +24,14 @@ repositories {
     mavenCentral()
 }
 
+application {
+    mainClass.set("com.benasher44.kloudfrontblogstats.AppKt")
+}
+
 sqldelight {
     database("KBSDatabase") {
-        packageName = "com.benasher44"
+        packageName = "com.benasher44.kloudfrontblogstats"
         dialect = "postgresql"
-        deriveSchemaFromMigrations = true
     }
 }
 
@@ -59,9 +63,11 @@ checkTask.configure {
 }
 
 dependencies {
+    implementation("com.github.ajalt.clikt:clikt:3.1.0")
     implementation("com.squareup.sqldelight:jdbc-driver:1.4.4")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.0.1")
     implementation("org.postgresql:postgresql:42.2.18")
+    implementation("org.slf4j:slf4j-simple:1.7.30")
     implementation(platform("software.amazon.awssdk:bom:2.15.53"))
     implementation("software.amazon.awssdk:s3")
 
@@ -72,4 +78,27 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+val fatJar by tasks.registering(Jar::class) {
+    dependsOn(configurations.named("runtimeClasspath"))
+    dependsOn(tasks.named("jar"))
+
+    archiveClassifier.set("fat")
+
+    manifest {
+        attributes["Main-Class"] = application.mainClass.get()
+    }
+
+    val sourceClasses = sourceSets.main.get().output.classesDirs
+    inputs.files(sourceClasses)
+
+    from(files(sourceClasses))
+    from(files(sourceClasses))
+    from(configurations.runtimeClasspath.get().asFileTree.files.map { zipTree(it) })
+    exclude("**/*.kotlin_metadata")
+    exclude("**/*.kotlin_module")
+    exclude("**/*.kotlin_builtins")
+    exclude("**/module-info.class")
+    exclude("META-INF/maven/**")
 }
