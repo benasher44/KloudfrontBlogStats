@@ -6,6 +6,8 @@ import com.squareup.sqldelight.db.SqlDriver
 import com.squareup.sqldelight.sqlite.driver.asJdbcDriver
 import org.postgresql.ds.PGSimpleDataSource
 
+// lazily connects to postgres to avoid unnecessary connections to
+// reduce costs associated with Aurora Serverless
 internal fun withLazyConnection(dbLambda: (queries: Lazy<AccessLogQueries>) -> Unit) {
     val lazyDriver = lazy {
         val url = System.getenv("PG_URL")
@@ -21,6 +23,7 @@ internal fun withLazyConnection(dbLambda: (queries: Lazy<AccessLogQueries>) -> U
             val database = KBSDatabase(driver)
 
             // TODO: fix setVersion query and support upgrades
+            //       https://github.com/AlecStrong/sql-psi/issues/136
             if (!driver.schemaVersionTableExists()) {
                 database.schemaVersionQueries.transaction {
                     KBSDatabase.Schema.create(driver)

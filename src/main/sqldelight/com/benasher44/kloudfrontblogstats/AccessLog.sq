@@ -8,4 +8,5 @@ CREATE TABLE AccessLog(
 
 insertLog:
 INSERT INTO AccessLog(accessedAt, referer, userAgent, path)
+-- https://github.com/AlecStrong/sql-psi/issues/234
 VALUES (CAST (? AS TIMESTAMP), ?, ?, ?);

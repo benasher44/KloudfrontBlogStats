@@ -2,8 +2,8 @@ package com.benasher44.kloudfrontblogstats.utils
 
 import java.util.logging.Level
 
+// OTHER_LOGGER can be set to be used instead of JavaLogger
 private var OTHER_LOGGER: Logger? = null
-
 internal fun setLogger(logger: Logger) {
     OTHER_LOGGER = logger
 }

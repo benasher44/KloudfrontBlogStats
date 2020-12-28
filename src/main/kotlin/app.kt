@@ -44,6 +44,8 @@ private fun handleObjects(bucket: String, s3Service: S3Service) {
         var count = 0
         withLazyConnection { lazyQueries ->
             s3Service.enumerateObjectsInBucket(bucket) { s3o, listCount ->
+
+                // listCount is uninitialized at the start of a new "page" of objects
                 if (!listCount.isInitialized()) {
                     LOGGER.log("Listed ${listCount.value} keys.")
                 }
@@ -74,7 +76,7 @@ private fun handleObject(
             queries.transaction {
                 input.enumerateLogs { date, time, referer, userAgent, path ->
                     queries.insertLog(
-                        // date and time in UTC
+                        // date and time in UTC (postgres timestamp format)
                         "$date $time",
                         referer,
                         userAgent,
