@@ -6,24 +6,35 @@ import com.squareup.sqldelight.db.SqlDriver
 import com.squareup.sqldelight.sqlite.driver.asJdbcDriver
 import org.postgresql.ds.PGSimpleDataSource
 
-internal fun withNewConnection(dbLambda: (queries: AccessLogQueries) -> Unit) {
-    val url = System.getenv("PG_URL")
-    val ds = PGSimpleDataSource()
-    ds.setUrl("jdbc:$url")
-    ds.user = System.getenv("PG_USER")
-    ds.password = System.getenv("PG_PASSWORD")
-    ds.asJdbcDriver().use { driver ->
-        val database = KBSDatabase(driver)
+internal fun withLazyConnection(dbLambda: (queries: Lazy<AccessLogQueries>) -> Unit) {
+    val lazyDriver = lazy {
+        val url = System.getenv("PG_URL")
+        val ds = PGSimpleDataSource()
+        ds.setUrl("jdbc:$url")
+        ds.user = System.getenv("PG_USER")
+        ds.password = System.getenv("PG_PASSWORD")
+        ds.asJdbcDriver()
+    }
+    try {
+        val accessLogQueries = lazy {
+            val driver = lazyDriver.value
+            val database = KBSDatabase(driver)
 
-        // TODO: fix setVersion query and support upgrades
-        if (!driver.schemaVersionTableExists()) {
-            database.schemaVersionQueries.transaction {
-                KBSDatabase.Schema.create(driver)
+            // TODO: fix setVersion query and support upgrades
+            if (!driver.schemaVersionTableExists()) {
+                database.schemaVersionQueries.transaction {
+                    KBSDatabase.Schema.create(driver)
+                }
+                database.schemaVersionQueries.setVersion()
             }
-            database.schemaVersionQueries.setVersion()
+            database.accessLogQueries
         }
 
-        dbLambda(database.accessLogQueries)
+        dbLambda(accessLogQueries)
+    } finally {
+        if (lazyDriver.isInitialized()) {
+            lazyDriver.value.close()
+        }
     }
 }
 

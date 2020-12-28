@@ -2,14 +2,12 @@ package com.benasher44.kloudfrontblogstats
 
 import com.benasher44.kloudfrontblogstats.logic.CLI
 import com.benasher44.kloudfrontblogstats.logic.S3Object
-import com.benasher44.kloudfrontblogstats.logic.S3ObjectParseResult
 import com.benasher44.kloudfrontblogstats.logic.S3Service
 import com.benasher44.kloudfrontblogstats.logic.enumerateLogs
-import com.benasher44.kloudfrontblogstats.logic.s3ResultsFromEventJson
 import com.benasher44.kloudfrontblogstats.utils.LOGGER
 import com.benasher44.kloudfrontblogstats.utils.logMessage
 import com.benasher44.kloudfrontblogstats.utils.setLogger
-import com.benasher44.kloudfrontblogstats.utils.withNewConnection
+import com.benasher44.kloudfrontblogstats.utils.withLazyConnection
 import software.amazon.awssdk.regions.Region
 import java.io.InputStream
 import java.io.OutputStream
@@ -18,7 +16,13 @@ import kotlin.system.exitProcess
 
 private val REGION by lazy {
     requireNotNull(System.getenv("LOG_BUCKET_REGION")) {
-        "Specify AWS region by setting the AWS_DEFAULT_REGION env var"
+        "Specify log bucket region by setting the LOG_BUCKET_REGION env var"
+    }
+}
+
+private val BUCKET by lazy {
+    requireNotNull(System.getenv("LOG_BUCKET")) {
+        "Specify log bucket by setting the LOG_BUCKET env var"
     }
 }
 
@@ -26,7 +30,8 @@ private val REGION by lazy {
 public fun s3Handler(input: InputStream, output: OutputStream) {
     try {
         handleObjects(
-            s3ResultsFromEventJson(input.readBytes().decodeToString(), REGION),
+            BUCKET,
+            S3Service(Region.of(REGION), true)
         )
     } finally {
         input.close()
@@ -34,24 +39,21 @@ public fun s3Handler(input: InputStream, output: OutputStream) {
     }
 }
 
-private fun handleObjects(objects: Iterable<S3ObjectParseResult>) {
+private fun handleObjects(bucket: String, s3Service: S3Service) {
     try {
-        val s3Service = S3Service(Region.of(REGION), true)
-        val count = objects.fold(0) { soFar, result ->
-            when (result) {
-                is S3ObjectParseResult.InvalidRegion -> {
-                    LOGGER.error(result.message)
-                    soFar
+        var count = 0
+        withLazyConnection { lazyQueries ->
+            s3Service.enumerateObjectsInBucket(bucket) { s3o, listCount ->
+                if (!listCount.isInitialized()) {
+                    LOGGER.log("Listed ${listCount.value} keys.")
                 }
-                is S3ObjectParseResult.Success -> {
-                    try {
-                        handleObject(result.s3Object, s3Service)
-                        soFar + 1
-                    } catch (e: Throwable) {
-                        LOGGER.error("Processing error: $result -  ${e.logMessage()}")
-                        soFar
-                    }
+                try {
+                    handleObject(s3o, s3Service, lazyQueries.value)
+                    count += 1
+                } catch (e: Throwable) {
+                    LOGGER.error("Processing error (${s3o.key}):  ${e.logMessage()}")
                 }
+                LOGGER.log("Processed ${s3o.key}")
             }
         }
         LOGGER.log("Processed $count objects successfully.")
@@ -63,22 +65,21 @@ private fun handleObjects(objects: Iterable<S3ObjectParseResult>) {
 
 private fun handleObject(
     s3o: S3Object,
-    s3Service: S3Service
+    s3Service: S3Service,
+    queries: AccessLogQueries
 ) {
     LOGGER.log("Getting ${s3o.key}")
     s3Service.getObject(s3o).use { downloadStream ->
         GZIPInputStream(downloadStream).use { input ->
-            withNewConnection { queries ->
-                queries.transaction {
-                    input.enumerateLogs { date, time, referer, userAgent, path ->
-                        queries.insertLog(
-                            // date and time in UTC
-                            "$date $time",
-                            referer,
-                            userAgent,
-                            path
-                        )
-                    }
+            queries.transaction {
+                input.enumerateLogs { date, time, referer, userAgent, path ->
+                    queries.insertLog(
+                        // date and time in UTC
+                        "$date $time",
+                        referer,
+                        userAgent,
+                        path
+                    )
                 }
             }
         }
@@ -89,15 +90,11 @@ private fun handleObject(
 
 fun main(args: Array<String>) = CLI {
     setLogger(this)
-    val service = S3Service(region, allowDelete)
     try {
-        service.enumerateObjectsInBucket(bucket) { s3o, count ->
-            if (!count.isInitialized()) {
-                LOGGER.log("Listed ${count.value} keys.")
-            }
-            handleObject(s3o, service)
-            LOGGER.log("Processed ${s3o.key}")
-        }
+        handleObjects(
+            bucket,
+            S3Service(region, allowDelete)
+        )
     } catch (e: Throwable) {
         LOGGER.error(e.logMessage())
         exitProcess(1)
