@@ -8,4 +8,4 @@ CREATE TABLE AccessLog(
 
 insertLog:
 INSERT INTO AccessLog(accessedAt, referer, userAgent, path)
-VALUES (?, ?, ?, ?);
+VALUES (CAST (? AS TIMESTAMP), ?, ?, ?);

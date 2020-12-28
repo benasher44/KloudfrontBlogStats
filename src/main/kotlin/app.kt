@@ -71,7 +71,7 @@ private fun handleObject(
                     input.enumerateLogs { date, time, referer, userAgent, path ->
                         queries.insertLog(
                             // date and time in UTC
-                            "$date $time z",
+                            "$date $time",
                             referer,
                             userAgent,
                             path

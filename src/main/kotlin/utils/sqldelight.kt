@@ -31,8 +31,8 @@ private fun SqlDriver.schemaVersionTableExists(): Boolean {
     executeQuery(
         null,
         """|SELECT 1 FROM information_schema.tables
-            |WHERE table_schema = 'schemaname' AND
-            |      table_name = 'SchemaVersion'
+            |WHERE table_schema = 'public' AND
+            |      table_name = 'schemaversion'
             |FETCH FIRST ROW ONLY
             |""".trimMargin(),
         0
