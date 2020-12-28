@@ -49,6 +49,6 @@ internal class S3Service(region: Region, val allowDelete: Boolean) {
                     lambda(S3Object(bucket, s3o.key()), count)
                 }
             }
-        } while (!response.isTruncated)
+        } while (response.isTruncated)
     }
 }
