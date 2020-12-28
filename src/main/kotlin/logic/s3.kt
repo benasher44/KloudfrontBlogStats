@@ -9,7 +9,7 @@ import java.io.InputStream
 
 internal data class S3Object(val bucket: String, val key: String)
 
-internal class S3Service(region: Region, val allowDelete: Boolean) {
+internal class S3Service(region: Region, private val allowDelete: Boolean) {
     private val client = S3Client.builder()
         .region(region)
         .build()

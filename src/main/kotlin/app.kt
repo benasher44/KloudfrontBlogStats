@@ -65,6 +65,7 @@ private fun handleObject(
     s3Service: S3Service? = null
 ) {
     val service = s3Service ?: S3Service(Region.of(REGION), true)
+    LOGGER.log("Getting ${s3o.key}")
     service.getObject(s3o).use { downloadStream ->
         GZIPInputStream(downloadStream).use { input ->
             withNewConnection { queries ->
@@ -82,6 +83,7 @@ private fun handleObject(
             }
         }
     }
+    LOGGER.log("Deleting ${s3o.key}")
     service.deleteObject(s3o)
 }
 
