@@ -54,8 +54,8 @@ aws lambda create-function --function-name YOUR_FUNCTION_NAME --runtime java8 \
     --zip-file fileb://build/libs/KloudfrontBlogStats-1.0-SNAPSHOT-fat.jar --handler com.benasher44.kloudfrontblogstats.AppKt::s3Handler \
     --role YOUR_ROLE_FOR_LAMBDA \
     --vpc-config YOUR_VPC_CONFIG \
-    --environment "Variables={LOG_BUCKET=YOUR_LOG_BUCKET,LOG_BUCKET_REGION=YOUR_S3_BUCKET_REGION,PG_URL=postgresql://YOUR_DB_LOCATION/YOUR_DB_NAME,PG_USER=YOUR_PG_USER,PG_PASSWORD=YOUR_PG_PASSWORD" \
-    --timeout 300
+    --environment "Variables={LOG_BUCKET=YOUR_LOG_BUCKET,LOG_BUCKET_REGION=YOUR_S3_BUCKET_REGION,PG_URL=postgresql://YOUR_DB_LOCATION/YOUR_DB_NAME,PG_USER=YOUR_PG_USER,PG_PASSWORD=YOUR_PG_PASSWORD}" \
+    --timeout 300 \
     --memory-size 512
 ```
 
